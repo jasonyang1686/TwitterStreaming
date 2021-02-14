@@ -18,7 +18,7 @@ There are some tools need to be installed before running the project:
 
 Download mongoDB from [mongoDB compass](https://www.mongodb.com/try/download/compass), and follow the installation instruction on https://docs.mongodb.com/manual/installation/, assume that you create your mongoDB's dbpath at /usr/local/var/mongodb and logpath at /usr/local/var/log/, then you can run the command in your terminal to start it:
 
-$ mongod --dbpath /usr/local/var/mongodb --logpath /usr/local/var/log/mongodb/mongo.log --fork
+`$ mongod --dbpath /usr/local/var/mongodb --logpath /usr/local/var/log/mongodb/mongo.log --fork`
 
 
 
