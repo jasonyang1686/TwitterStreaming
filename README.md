@@ -64,7 +64,7 @@ The project is run and compied on macOS Big Sur ver. 11.2.1, following is the so
 
 ## Workflow
 
-This project is consisting of two main parts: on the Python side the program is receiving stream data from Twitter API and publishing it via Kafka, on the  Java side the program is Spark streaming the messages from Kafka, processing them based on the requirements and storing them into mongoDB.
+This project is consisting of two main parts: on the Python side the program is receiving stream data from Twitter API and publishing it via Kafka; on the  Java side the program is Spark streaming the messages from Kafka, processing them based on the requirements and storing them into mongoDB.
 
 ##### Python
 
@@ -85,23 +85,21 @@ After filtering with keyword, the individual tweets objects streamed from this A
 
 ##### Java
 
-I am using `Spark Streaming+Kafka` integration for streaming and processing data between Kafka and Spark, and using `Spark Streaming+mongodb` integration for processing and storing data between Spark streaming and mongodb. 
+I am using `Spark Streaming+Kafka` integration for streaming and processing data between Kafka and Spark, and using `Spark Streaming+mongodb` integration for processing and storing data between Spark streaming and mongodb. The most important component behind Spark is RDD(Resilient Distributed Datasets), Spark can parallelly process these RDDs in its cluster. As the main data processing types Spark supports batch processing and parallel processing. In both of these methods, Spark uses RRD as the underline data structure. 
 
 ###### Spark streaming
 
-The most important component behind Spark is RDD(Resilient Distributed Datasets), Spark can parallelly process these RDDs in its cluster. As the main data processing types Spark supports batch processing and parallel processing. In both of these methods, Spark uses RRD as the underline data structure. 
-
-I use RDD to process Spark streaming once Kafka consumer receive messages, In this POC the producer and consumer are running locally, I set master nodes as `SparkConf.setMaster("local[*]")` to run locally with as many cores as it can. In each RDD I will count the number of tweets it consumed and check if the tweet is having to do with **music**, due to the time-limit I just simply hard code some key words related to music like `music`, `song`, `singer`, etc. If the tweet contains one or more keywords, then it will be filtered out. One better idea is to analyze the semantic of the tweet to see if it is really related to some certain area. Due to the time-limit I am not considering to implement semantic analysis like NLP on this POC, it can be done in the further if it's needed. 
-
-To check if the tweet is **duplicated**, there might have several different definitions about it, we can say two users retweet the same original tweet is duplicated, or the two tweets are talking about the same thing is duplicated. I am just applying the duplicate checker for one simple scenario, that the contents of the tweets are exactly the same. 
+I use RDD to process Spark streaming once Kafka consumer receive messages. In this POC the producer and consumer are running locally, I set master nodes as `SparkConf.setMaster("local[*]")` to run locally with as many cores as it can. In each RDD I will count the accumulated number of tweets it consumed and check if the tweet is having to do with **music.** The **total number** of consumed tweets will be displayed on-the-fly. Due to the time-limit I just simply hard code some key words related to music like `music`, `song`, `singer`, etc. If the tweet contains one or more keywords, then it will be filtered out. One better idea is to analyze the semantic of the tweet to see if it is really related to some certain area. Due to the time-limit I am not considering to implement semantic analysis like NLP on this POC, it can be done in the further if it's needed. 
 
 ###### store data
 
-JSON may be the most popular data-interchange format over the whole internet, however the nested JSON might have very complex structure and not so firendly for structured schema. I choose [json-flattener](https://github.com/wnameless/json-flattener) to flatten the JSON format object before storing into database.
+JSON may be the most popular data-interchange format over the whole internet, however the nested JSON might have very complex structure and not so firendly for structured schema. As we need the dataset for ML purpose in the furtue, I choose [json-flattener](https://github.com/wnameless/json-flattener) to flatten the JSON format object before storing into database. For demonstration purposes I created one database and one collection on mongoDB and all the processed data will be stored into it. 
 
+To check if the tweet is **duplicated**, there might have several different definitions about it, we can say two users retweet the same original tweet is duplicated, or the two tweets are talking about the same thing is duplicated. I am just applying the duplicate checker for one simple scenario, that the contents of the tweets are exactly the same. That might happened in some distributed environment like Kafka consumer received redundant message from producer or consumer didn't send back the receipt for some reason then producer resend the redundant message. According to this case, "user id + created timestamp" is a good choice for indicating unique id of each tweet. As mongodb is generating a unique id `_id` for each document, I replaced it with my new combined id for each tweet (or we call it document).
 
+I am using one simple but not very effective way to do "if  not exists then insert" by `db.collection.updateOne()`. Every time the new coming document will be compared with the existing collection, if it is not existed, then it will be inserted into the current collection. Another better idea might be maintaining a temp hashtable for each tweets in some certain size and expired time, then we can compare it with new record to see if it's duplicated. Again it is not implemented in the current POC due to the time-limit.
 
-
+The final step of the RDD is to count the **unique number** of the tweets, I am using `db.collection.estimatedDocumentCount()` to get the result as the collection only contains unique post-processed tweets. It is a compromised way for this POC when the size of data streaming and collection is relatively small but for a high volumn data streaming or large scale dataset it is a time-consuming process as everytime it will parse the whole collection to get the count, another better solution is to maintain a counter to record this kind of record. 
 
 The information about java dependencies and related versions can be found in the pom file. To compile the java code and run it, you can download or import the source code and run maven command:
 
@@ -109,3 +107,4 @@ The information about java dependencies and related versions can be found in the
 
 Here is the architcture overview of this POC:
 
+![](workflow.png)
