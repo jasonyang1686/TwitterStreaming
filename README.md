@@ -16,26 +16,96 @@ There are some tools need to be installed before running the project:
 
 ##### 1. mongoDB
 
-Download mongoDB from [mongoDB compass](https://www.mongodb.com/try/download/compass), and follow the installation instruction on https://docs.mongodb.com/manual/installation/, assume that you create your mongoDB's dbpath at /usr/local/var/mongodb and logpath at /usr/local/var/log/, then you can run the command in your terminal to start it:
+MongoDB is a very powerful NoSQL database and suitable for this project as the data stored in mongoDB is in JSON format which is also the one Twitter API used for its data. And I assume that the project will be running on a distributed system, mongoDB offers manay benefits for integration with Spark or other distributed processing technologies.  
+
+You can download mongoDB from [mongoDB compass](https://www.mongodb.com/try/download/compass), and follow the installation instruction on https://docs.mongodb.com/manual/installation/, assume that you create your mongoDB's dbpath at `/usr/local/var/mongodb` and logpath at `/usr/local/var/log/`, then you can run the command in your terminal to start it:
 
 `$ mongod --dbpath /usr/local/var/mongodb --logpath /usr/local/var/log/mongodb/mongo.log --fork`
 
+The default port number is `27017`
+
+##### 2. Kafka
+
+Apache Kafka is a distributed streaming platform, I choose Kafka as my produce-consume messaging system to reliably get data between pipeline components. Tweets are received and published to one topic in the Kafka brokers, and eventually consumed by subscribers.
+
+You can download Kafka from https://kafka.apache.org and install and run it as a [quick start](https://kafka.apache.org/07/documentation.html) . Also you can google for more information about how to config it, I will not list them due to a time-limit. As Kafka is using Apache Zookeeper as its distributed services, you need to start zookeeper service first:
+
+`$ {KAFKA_HOME}/bin/zookeeper-server-start.sh config/zookeeper.properties`
+
+Then start kafka service at your terminal:
+
+`$ {KAFKA_HOME}/bin/kafka-server-start.sh ../config/server.properties`
+
+The default listen port for Kafka is `2181` 
+
+##### 3. Spark
+
+Spark is a fast big data processing engine and supports a rich set of highr-level tools including Spark SQL for structured data processing, MLlib for machine learning and Spark Streaming. In this project I used Spark to consume and process the streams of data from Kafka and then write to MongoDB.
+
+Similar as Kafka installation process, you can download the package from https://spark.apache.org/downloads.html, I would recommand to download the package with pre-built hadoop one, it will save your time to config both Hadoop and Spark. To install it at once, simply run the command in your terminal:
+
+`$ {SPARK_HOME}/sbin/start-all.sh`
+
+By default you can access the web UI for the master at port `8080`
+
+The project is run and compied on macOS Big Sur ver. 11.2.1, following is the software with the version I used for this project: 
+
+|        Tools        |          Ver          |
+| :-----------------: | :-------------------: |
+|       Python        |          3.7          |
+|    Pycharm (IDE)    |        2020.3         |
+|        Java         |         JDK8          |
+| IntelliJ IDEA (IDE) |        2020.2         |
+|    Apache Kafka     |   Kafka_2.11-1.1.1    |
+|    Apache Spark     | Spark-2.1.1-hadoop2.7 |
+|       mongoDB       |        1.25.0         |
 
 
 
+## Workflow
 
-I choose tweepy as my 
+This project is consisting of two main parts: on the Python side the program is receiving stream data from Twitter API and publishing it via Kafka, on the  Java side the program is Spark streaming the messages from Kafka, processing them based on the requirements and storing them into mongoDB.
+
+##### Python
+
+###### stream Tweets
+
+I choose `tweepy` as my python library for the Twitter API. By using it I can stream real-time tweets and filter to only return Tweets based on keywords (in this proof-of-concept the ketword is "Justin Bieber"), language (set as English in this POC), location, etc. 
+
+###### messaging
+
+After filtering with keyword, the individual tweets objects streamed from this API are in JSON format.  I use `kafka` as my broker to produce the message contained this JSON format string in UTF-8 encoding. For this POC, I just choose one producer is working and the topic number is also one. The required python packages and versions are listed as:
+
+|   Packages   |  Ver   |
+| :----------: | :----: |
+| Kafka-python | 2.0.2  |
+|    Tweepy    | 3.10.0 |
 
 
 
-as my  and .I perfomed a basic key words filter of real-time tweets and store 
+##### Java
 
+I am using `Spark Streaming+Kafka` integration for streaming and processing data between Kafka and Spark, and using `Spark Streaming+mongodb` integration for processing and storing data between Spark streaming and mongodb. 
 
+###### Spark streaming
 
-1)flatten JSON
+The most important component behind Spark is RDD(Resilient Distributed Datasets), Spark can parallelly process these RDDs in its cluster. As the main data processing types Spark supports batch processing and parallel processing. In both of these methods, Spark uses RRD as the underline data structure. 
+
+I use RDD to process Spark streaming once Kafka consumer receive messages, In this POC the producer and consumer are running locally, I set master nodes as `SparkConf.setMaster("local[*]")` to run locally with as many cores as it can. In each RDD I will count the number of tweets it consumed and check if the tweet is having to do with **music**, due to the time-limit I just simply hard code some key words related to music like `music`, `song`, `singer`, etc. If the tweet contains one or more keywords, then it will be filtered out. One better idea is to analyze the semantic of the tweet to see if it is really related to some certain area. Due to the time-limit I am not considering to implement semantic analysis like NLP on this POC, it can be done in the further if it's needed. 
+
+To check if the tweet is **duplicated**, there might have several different definitions about it, we can say two users retweet the same original tweet is duplicated, or the two tweets are talking about the same thing is duplicated. I am just applying the duplicate checker for one simple scenario, that the contents of the tweets are exactly the same. 
+
+###### store data
 
 JSON may be the most popular data-interchange format over the whole internet, however the nested JSON might have very complex structure and not so firendly for structured schema. I choose [json-flattener](https://github.com/wnameless/json-flattener) to flatten the JSON format object before storing into database.
 
-2) MongoDB
 
-The information about java dependencies and related versions can be found in the pom file.
+
+
+
+The information about java dependencies and related versions can be found in the pom file. To compile the java code and run it, you can download or import the source code and run maven command:
+
+`$ mvn clean install`
+
+Here is the architcture overview of this POC:
+
