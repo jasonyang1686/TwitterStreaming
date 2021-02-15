@@ -8,7 +8,7 @@ In this project I implemented a data pipeline to stream real-time Twitter tweets
 
 
 
-## Developement Environments
+## Environments
 
 In order to access to [Twitter Streaming API ,](https://developer.twitter.com/en/docs/tutorials/consuming-streaming-data) we  need to apply our own four keys: Consumer Key, Consumer Secrect, Access Token and Access Token Secret via https://dev.twitter.com/apps/new, more information about it can be found from [Twitter Developer Site](https://developer.twitter.com/en/docs/authentication/oauth-1-0a/obtaining-user-access-tokens) .
 
@@ -89,7 +89,7 @@ I am using `Spark Streaming+Kafka` integration for streaming and processing data
 
 ###### Spark streaming
 
-I use RDD to process Spark streaming once Kafka consumer receive messages. In this POC the producer and consumer are running locally, I set master nodes as `SparkConf.setMaster("local[*]")` to run locally with as many cores as it can. In each RDD I will count the accumulated number of tweets it consumed and check if the tweet is having to do with **music.** The **total number** of consumed tweets will be displayed on-the-fly. Due to the time-limit I just simply hard code some key words related to music like `music`, `song`, `singer`, etc. If the tweet contains one or more keywords, then it will be filtered out. One better idea is to analyze the semantic of the tweet to see if it is really related to some certain area. Due to the time-limit I am not considering to implement semantic analysis like NLP on this POC, it can be done in the further if it's needed. 
+I use RDD to process Spark streaming once Kafka consumer receive messages. In this POC the producer and consumer are running locally, I set master nodes as `SparkConf.setMaster("local[*]")` to run locally with as many cores as it can. In each RDD I will count the accumulated number of tweets it consumed and check if the tweet is having to do with **music.** The **total number** of consumed tweets will be displayed on-the-fly. Due to the time-limit I just simply hard code some key words related to music like `music`, `song`, `singer`, etc. If the tweet contains one or more keywords, then it will be **filtered out**. According to the requirement it is not clear that should I keep or remove those music related tweets, it is not technically problem but the result will be totally different. I am saving the tweets which is not related to music based on my assumption. One better idea is to analyze the semantic of the tweet to see if it is really related to some certain area. Due to the time-limit I am not considering to implement a better key words dictionary or semantic analysis like NLP on this POC, it can be done in the further if it's needed. 
 
 ###### store data
 
@@ -105,6 +105,42 @@ The information about java dependencies and related versions can be found in the
 
 `$ mvn clean install`
 
+This POC does not have QA testing, UAT and PROD stage which should be included in production-ready solution.
+
 Here is the architcture overview of this POC:
 
 ![](workflow.png)
+
+## Questions
+
+#### What are the risks involved in building such a pipeline?
+
+A typical data pipeline could be divided into the several components from source to destination:
+
+1. Source
+
+   The place where a pipeline extracts data from. The source should be accessible to guarantee the pipeline is producible.  And the pipeline should be reproducible in the case of the integration with different source data API. For example, one company is using SOAP APIs and another one is using REST APIs, or the marketing team is using Salesforce and product team is relying on mongoDB, it is important for pipeline to be flexible to fetch data from different sources.
+
+2. Dataflow
+
+   The movement of data from source to destination. During this transportation, data will be transformed, processed and cleaned up. One main purpose of a data pipeline is collecting data for data analysis, data mining and machine learning. Sometimes incomplete or redundant data will bring troubles in data analysis. A monitoring mechanism should be applied to check for data accuracy and data consistent, particularly as the size of data grows larger. 
+
+   Flexibility is also needed to be concerned, for example, changes in API might result in unexpected characters that the pipeline hasn't handled in the past. 
+
+3. Destination
+
+   The endpoint for the data pipeline is also important. One risk is the target schemas are not matching source or streaming data, or some databases are not optimized for real-time processing. Another potential issue is some database infrastructure cannot support the increasing data volumes and the evolution of data sources.
+
+   Overall, the challenges/risks in building a pipeline might include: accuracy, scalability, reproducibility, consistent and reliability.
+
+
+
+#### How would you roll out the pipeline going from proof-of-concept to a production-ready solution?
+
+- What would a production-ready solution entail that a POC wouldn't?
+
+  Production-ready solution is when a system or a major update can be introduced into **production**, and **ready** always means it is stably running on production environment and satisifying the current project requirements. For a typical POC, it provides a prototype to demonstrate to reflect the real-world scenario. POC is usually used by developer to examine if the requirements are valid, and it does not intend to release. POC is very useful for the early stages in the development life cycle, it can save months of code by proving if an idea is valid, but it's still lacking of most of key performance aspects like security, reliability, maintainability, usability which production-ready solution should have. The POC's functionality is limited and is only focusing on the aspects to be proved — which is way **less** than the full product. 
+
+  Production-ready solution should be well documented for maintenance and the ability to scale.  But when it comes to a POC, documentation is not as important as production-ready's. As POC is often a "quick and dirty" demonstration of some idea, it typically has a short life-cycle and will not be as large as the full product.  Last but not least, Good user experience which is highly concerned in production-ready solution will also be ignored in POC in most of the cases.
+
+  Overall, A POC is far away from production-ready solution.
